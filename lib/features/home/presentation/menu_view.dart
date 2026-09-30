@@ -1,130 +1,133 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/app_colors.dart';
+import '../../../core/widgets/curved_page.dart';
+import '../../../core/widgets/empty_view.dart';
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/loading_view.dart';
+import '../../../core/widgets/search_field.dart';
+import '../../categories/data/models/category_model.dart';
+import '../../categories/presentation/widgets/categories_bar.dart';
+import '../../foods/data/models/food_model.dart';
+import '../../foods/data/services/food_service.dart';
+import '../../foods/presentation/widgets/food_list_card.dart';
 import '../../item_details/presentation/item_details_view.dart';
+import '../data/services/home_service.dart';
 
-class MenuView extends StatelessWidget {
+/// Tab 2: GET categories + GET products (filtered by category), search = products/search.
+class MenuView extends StatefulWidget {
   const MenuView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final categories = ['Snacks', 'Meal', 'Vegan', 'Dessert', 'Drinks'];
+  State<MenuView> createState() => _MenuViewState();
+}
 
-    return Scaffold(
-      backgroundColor: AppColors.headerYellow,
+class _MenuViewState extends State<MenuView> {
+  final FoodService _foodService = FoodService();
+  final HomeService _homeService = HomeService();
+  final TextEditingController _searchController = TextEditingController();
+
+  List<CategoryModel> _categories = [];
+  CategoryModel? _selected;
+  List<FoodModel> _foods = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final categories = await _homeService.getCategories();
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        _selected = categories.isNotEmpty ? categories.first : null;
+      });
+      await _loadFoods();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadFoods() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final foods = await _foodService.getFoods(
+        categoryId: _selected?.id,
+        query: _searchController.text.trim(),
+      );
+      if (mounted) setState(() => _foods = foods);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _selectCategory(CategoryModel category) {
+    setState(() => _selected = category);
+    _loadFoods();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CurvedPage(
+      header: Padding(
+        padding: const EdgeInsets.all(4),
+        child: SearchField(controller: _searchController, onSubmitted: (_) => _loadFoods()),
+      ),
       body: Column(
         children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-            ),
+          CategoriesBar(
+            categories: _categories,
+            selected: _selected,
+            onSelected: _selectCategory,
           ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: 70,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 14),
-                      itemBuilder: (context, index) {
-                        return Column(
-                          children: [
-                            const CircleAvatar(
-                              backgroundColor: AppColors.inputFill,
-                              radius: 22,
-                              child: Icon(Icons.fastfood,
-                                  color: AppColors.primaryOrange, size: 20),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(categories[index],
-                                style: const TextStyle(fontSize: 11)),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ItemDetailsView()),
-                          ),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  height: 140,
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.shade100,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Icon(Icons.set_meal,
-                                      size: 50, color: AppColors.primaryOrange),
-                                ),
-                                const SizedBox(height: 8),
-                                const Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('Mexican Appetizer',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16)),
-                                    Text('\$15.00',
-                                        style: TextStyle(
-                                            color: AppColors.primaryOrange,
-                                            fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                const Text('Tortilla Chips With Topping',
-                                    style: TextStyle(
-                                        color: Colors.grey, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                ],
-              ),
-            ),
-          )
+          const SizedBox(height: 12),
+          Expanded(child: _buildFoods()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFoods() {
+    if (_isLoading) return const LoadingView();
+    if (_error != null) {
+      return ErrorView(
+        message: _error!,
+        onRetry: _categories.isEmpty ? _loadCategories : _loadFoods,
+      );
+    }
+    if (_foods.isEmpty) return const EmptyView(icon: Icons.fastfood, message: 'No dishes found');
+
+    return ListView.builder(
+      itemCount: _foods.length,
+      itemBuilder: (context, index) => FoodListCard(
+        food: _foods[index],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ItemDetailsView(food: _foods[index])),
+        ),
       ),
     );
   }

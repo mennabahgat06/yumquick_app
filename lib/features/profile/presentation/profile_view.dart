@@ -1,113 +1,118 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/app_colors.dart';
+import '../../../core/utils/app_snack_bar.dart';
+import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/curved_page.dart';
+import '../../auth/data/models/user_model.dart';
+import '../../auth/data/services/auth_service.dart';
+import '../../auth/presentation/welcome_view.dart';
+import '../../favorites/presentation/favorites_view.dart';
 import '../../orders/presentation/my_orders_view.dart';
-import 'update_profile_view.dart';
 import 'settings_view.dart';
+import 'update_profile_view.dart';
+import 'widgets/profile_header.dart';
+import 'widgets/profile_tile.dart';
 
-class ProfileView extends StatelessWidget {
+/// Tab 3: GET get_user_data + menu (profile, orders, favorites, settings, logout, delete account).
+class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.headerYellow,
-      body: Column(
-        children: [
-          const SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 36,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person,
-                        size: 40, color: AppColors.headerYellow),
-                  ),
-                  SizedBox(height: 10),
-                  Text('John Smith',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold)),
-                  Text('LoremIpsum@email.com',
-                      style: TextStyle(color: Colors.white70, fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                children: [
-                  _buildProfileTile(
-                    icon: Icons.person_outline,
-                    title: 'My Profile',
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const UpdateProfileView())),
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.shopping_bag_outlined,
-                    title: 'My Orders',
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const MyOrdersView())),
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.favorite_border,
-                    title: 'My Favorites',
-                    onTap: () {},
-                  ),
-                  _buildProfileTile(
-                    icon: Icons.settings_outlined,
-                    title: 'Settings',
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const SettingsView())),
-                  ),
-                  const Divider(),
-                  _buildProfileTile(
-                    icon: Icons.logout,
-                    title: 'Log Out',
-                    color: Colors.red,
-                    onTap: () =>
-                        Navigator.popUntil(context, (route) => route.isFirst),
-                  ),
-                ],
-              ),
-            ),
-          )
-        ],
-      ),
+  State<ProfileView> createState() => _ProfileViewState();
+}
+
+class _ProfileViewState extends State<ProfileView> {
+  final AuthService _authService = AuthService();
+  UserModel? _user;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final user = await _authService.getUserData();
+      if (mounted) setState(() => _user = user);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _open(Widget screen) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    _load();
+  }
+
+  void _goToWelcome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const WelcomeView()),
+      (route) => false,
     );
   }
 
-  Widget _buildProfileTile({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color color = AppColors.textDark,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-      trailing:
-          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      onTap: onTap,
+  Future<void> _logout() async {
+    await _authService.logout();
+    if (mounted) _goToWelcome();
+  }
+
+  /// DELETE delete_user (after confirmation)
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const ConfirmDialog(
+        title: 'Delete your account?',
+        message: 'This cannot be undone.',
+        confirmText: 'Delete',
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _authService.deleteUser();
+      if (mounted) _goToWelcome();
+    } catch (e) {
+      if (mounted) AppSnackBar.show(context, e.toString(), isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CurvedPage(
+      header: ProfileHeader(user: _user, error: _error),
+      body: ListView(
+        children: [
+          ProfileTile(
+            icon: Icons.person_outline,
+            title: 'My Profile',
+            onTap: () => _open(UpdateProfileView(user: _user)),
+          ),
+          ProfileTile(
+            icon: Icons.shopping_bag_outlined,
+            title: 'My Orders',
+            onTap: () => _open(const MyOrdersView()),
+          ),
+          ProfileTile(
+            icon: Icons.favorite_border,
+            title: 'My Favorites',
+            onTap: () => _open(const FavoritesView()),
+          ),
+          ProfileTile(
+            icon: Icons.settings_outlined,
+            title: 'Settings',
+            onTap: () => _open(const SettingsView()),
+          ),
+          const Divider(),
+          ProfileTile(icon: Icons.logout, title: 'Log Out', color: Colors.red, onTap: _logout),
+          ProfileTile(
+            icon: Icons.delete_outline,
+            title: 'Delete Account',
+            color: Colors.red,
+            onTap: _deleteAccount,
+          ),
+        ],
+      ),
     );
   }
 }

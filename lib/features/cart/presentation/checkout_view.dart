@@ -1,78 +1,67 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/app_colors.dart';
+import '../../../core/utils/app_snack_bar.dart';
+import '../../../core/utils/price_formatter.dart';
+import '../../../core/widgets/curved_page.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../orders/data/services/order_service.dart';
+import '../data/models/cart_model.dart';
+import '../data/services/cart_service.dart';
+import 'widgets/cart_summary.dart';
 
-class CheckoutView extends StatelessWidget {
-  const CheckoutView({super.key});
+/// POST place_order with the cart items, then empties the cart.
+/// Returns true to the cart screen when the order is placed.
+class CheckoutView extends StatefulWidget {
+  final CartModel cart;
+
+  const CheckoutView({super.key, required this.cart});
+
+  @override
+  State<CheckoutView> createState() => _CheckoutViewState();
+}
+
+class _CheckoutViewState extends State<CheckoutView> {
+  final OrderService _orderService = OrderService();
+  final CartService _cartService = CartService();
+  bool _isLoading = false;
+
+  Future<void> _placeOrder() async {
+    setState(() => _isLoading = true);
+    try {
+      await _orderService.placeOrder(widget.cart.items);
+      await _cartService.clear();
+      if (!mounted) return;
+      AppSnackBar.show(context, 'Order placed successfully!');
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) AppSnackBar.show(context, e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.headerYellow,
-      body: Column(
+    return CurvedPage(
+      title: 'Confirm Order',
+      body: ListView(
         children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Expanded(
-                    child: Text('Confirm Order', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
+          const Text('Order Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 12),
+          ...widget.cart.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text('• ${item.name}  x${item.quantity}  -  ${PriceFormatter.format(item.total)}'),
             ),
           ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Shipping Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.inputFill,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('778 Locust View Drive Oakland, CA', style: TextStyle(fontSize: 13)),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Order Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 12),
-                  const Text('• Strawberry Shake - \$20.00'),
-                  const Text('• Broccoli Lasagna - \$12.00'),
-                  const Spacer(),
-                  CustomPrimaryButton(
-                    text: 'Place Order',
-                    backgroundColor: AppColors.headerYellow,
-                    textColor: Colors.white,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Order placed successfully!')),
-                      );
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          )
+          CartSummary(cart: widget.cart),
+          const SizedBox(height: 24),
+          CustomPrimaryButton(
+            text: 'Place Order',
+            backgroundColor: AppColors.headerYellow,
+            isLoading: _isLoading,
+            onPressed: _placeOrder,
+          ),
         ],
       ),
     );

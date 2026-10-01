@@ -1,93 +1,93 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/app_colors.dart';
+import '../../../core/utils/app_snack_bar.dart';
+import '../../../core/utils/price_formatter.dart';
+import '../../../core/widgets/app_network_image.dart';
+import '../../../core/widgets/curved_page.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../cart/data/services/cart_service.dart';
+import '../../favorites/data/services/favorite_service.dart';
+import '../../foods/data/models/food_model.dart';
+import 'widgets/quantity_selector.dart';
 
+/// Dish details (from the list), add to the local cart, POST add_to_favorite.
 class ItemDetailsView extends StatefulWidget {
-  const ItemDetailsView({super.key});
+  final FoodModel food;
+
+  const ItemDetailsView({super.key, required this.food});
 
   @override
   State<ItemDetailsView> createState() => _ItemDetailsViewState();
 }
 
 class _ItemDetailsViewState extends State<ItemDetailsView> {
-  int count = 1;
+  final CartService _cartService = CartService();
+  final FavoriteService _favoriteService = FavoriteService();
+
+  FoodModel get _food => widget.food;
+  late bool _isFavorite = widget.food.isFavorite;
+  int _count = 1;
+  bool _isAdding = false;
+
+  Future<void> _toggleFavorite() async {
+    final newValue = !_isFavorite;
+    setState(() => _isFavorite = newValue);
+    try {
+      if (newValue) {
+        await _favoriteService.add(_food.id);
+      } else {
+        await _favoriteService.remove(_food.id);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isFavorite = !newValue); // undo
+      AppSnackBar.show(context, e.toString(), isError: true);
+    }
+  }
+
+  Future<void> _addToCart() async {
+    setState(() => _isAdding = true);
+    try {
+      await _cartService.addToCart(food: _food, quantity: _count);
+      if (!mounted) return;
+      AppSnackBar.show(context, 'Added to cart');
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) AppSnackBar.show(context, e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.headerYellow,
-      body: Column(
+    return CurvedPage(
+      title: _food.name,
+      action: IconButton(
+        icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border,
+            color: AppColors.primaryOrange),
+        onPressed: _toggleFavorite,
+      ),
+      body: ListView(
         children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Text('Mexican Appetizer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const Icon(Icons.favorite_border, color: AppColors.primaryOrange),
-                ],
+          AppNetworkImage(url: _food.imageUrl, height: 220, width: double.infinity, radius: 20),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(PriceFormatter.format(_food.price),
+                  style: const TextStyle(
+                      color: AppColors.primaryOrange, fontSize: 24, fontWeight: FontWeight.bold)),
+              QuantitySelector(
+                quantity: _count,
+                onChanged: (value) => setState(() => _count = value),
               ),
-            ),
+            ],
           ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 220,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.fastfood, size: 80, color: AppColors.primaryOrange),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('\$50.00', style: TextStyle(color: AppColors.primaryOrange, fontSize: 24, fontWeight: FontWeight.bold)),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle, color: AppColors.primaryOrange),
-                            onPressed: () => setState(() => count > 1 ? count-- : null),
-                          ),
-                          Text('$count', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle, color: AppColors.primaryOrange),
-                            onPressed: () => setState(() => count++),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Tortilla Chips With Topping', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                  const Spacer(),
-                  CustomPrimaryButton(
-                    text: 'Add to Cart',
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-          )
+          const SizedBox(height: 12),
+          Text(_food.description, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          const SizedBox(height: 32),
+          CustomPrimaryButton(text: 'Add to Cart', isLoading: _isAdding, onPressed: _addToCart),
         ],
       ),
     );

@@ -4,6 +4,7 @@ import '../../../core/widgets/custom_button.dart';
 import 'login_view.dart';
 import 'register_view.dart';
 
+/// Orange start screen: logo + Log In / Sign Up.
 class WelcomeView extends StatelessWidget {
   const WelcomeView({super.key});
 
@@ -15,7 +16,6 @@ class WelcomeView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
               Container(
@@ -25,11 +25,7 @@ class WelcomeView extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.headerYellow, width: 4),
                 ),
-                child: const Icon(
-                  Icons.restaurant,
-                  color: AppColors.headerYellow,
-                  size: 60,
-                ),
+                child: const Icon(Icons.restaurant, color: AppColors.headerYellow, size: 60),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -43,7 +39,7 @@ class WelcomeView extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Lorem ipsum dolor sit amet, consectetur\nadipiscing elit, sed do eiusmod.',
+                'Delicious food from the best restaurants,\ndelivered quickly to your door.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, fontSize: 13),
               ),
@@ -53,9 +49,7 @@ class WelcomeView extends StatelessWidget {
                 backgroundColor: AppColors.headerYellow,
                 textColor: AppColors.primaryOrange,
                 onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginView()),
-                ),
+                    context, MaterialPageRoute(builder: (_) => const LoginView())),
               ),
               const SizedBox(height: 14),
               CustomPrimaryButton(
@@ -63,9 +57,7 @@ class WelcomeView extends StatelessWidget {
                 backgroundColor: Colors.white,
                 textColor: AppColors.primaryOrange,
                 onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterView()),
-                ),
+                    context, MaterialPageRoute(builder: (_) => const RegisterView())),
               ),
               const SizedBox(height: 40),
             ],

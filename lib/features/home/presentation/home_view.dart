@@ -1,190 +1,108 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/app_colors.dart';
-import '../../cart/presentation/cart_view.dart';
-import '../../item_details/presentation/item_details_view.dart';
+import '../../../core/widgets/curved_page.dart';
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/loading_view.dart';
+import '../../foods/data/models/food_model.dart';
+import '../../foods/data/services/food_service.dart';
+import '../../foods/presentation/foods_view.dart';
+import '../../foods/presentation/widgets/best_seller_list.dart';
+import '../../foods/presentation/widgets/food_grid.dart';
+import '../data/models/slider_model.dart';
+import '../data/services/home_service.dart';
+import 'widgets/home_header.dart';
+import 'widgets/slider_banner.dart';
+import 'widgets/section_header.dart';
 
-class HomeView extends StatelessWidget {
+/// Tab 1: GET sliders, best_seller_products, top_rated_products.
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
 
   @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  final FoodService _foodService = FoodService();
+  final HomeService _homeService = HomeService();
+  List<SliderModel> _sliders = [];
+  List<FoodModel> _bestSellers = [];
+  List<FoodModel> _recommended = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        _homeService.getSliders(),
+        _foodService.getBestSellers(),
+        _foodService.getRecommended(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _sliders = results[0] as List<SliderModel>;
+        _bestSellers = results[1] as List<FoodModel>;
+        _recommended = results[2] as List<FoodModel>;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _openFoods(String title, {String query = '', List<FoodModel>? foods}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FoodsView(title: title, query: query, foods: foods)),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.headerYellow,
-      body: Column(
+    return CurvedPage(
+      header: HomeHeader(
+        onSearch: (query) {
+          if (query.trim().isNotEmpty) _openFoods('Search', query: query.trim());
+        },
+      ),
+      bodyPadding: const EdgeInsets.all(16),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) return const LoadingView();
+    if (_error != null) return ErrorView(message: _error!, onRetry: _load);
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
         children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: const TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Search...',
-                              prefixIcon:
-                                  Icon(Icons.search, color: Colors.grey),
-                              border: InputBorder.none,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CartView()),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.shopping_cart_outlined,
-                              color: AppColors.primaryOrange),
-                        ),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Good Morning',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold)),
-                  const Text("Rise And Shine! It's Breakfast Time",
-                      style: TextStyle(color: Colors.white70, fontSize: 12)),
-                ],
-              ),
-            ),
+          SectionHeader(
+            title: 'Best Seller',
+            onViewAll: () => _openFoods('Best Seller', foods: _bestSellers),
           ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Best Seller',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text('View All >',
-                            style: TextStyle(
-                                color: AppColors.primaryOrange, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 80,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: 4,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              width: 80,
-                              color: Colors.orange.shade100,
-                              child: const Icon(Icons.fastfood,
-                                  color: AppColors.primaryOrange),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryOrange,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Experience our delicious new dish',
-                                    style: TextStyle(
-                                        color: Colors.white70, fontSize: 12)),
-                                Text('30% OFF',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.local_pizza,
-                              color: Colors.white, size: 60),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Recommend',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.1,
-                      ),
-                      itemCount: 4,
-                      itemBuilder: (context, index) {
-                        return GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ItemDetailsView()),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Center(
-                              child: Icon(Icons.lunch_dining,
-                                  size: 48, color: AppColors.primaryOrange),
-                            ),
-                          ),
-                        );
-                      },
-                    )
-                  ],
-                ),
-              ),
-            ),
-          )
+          const SizedBox(height: 12),
+          BestSellerList(foods: _bestSellers),
+          const SizedBox(height: 16),
+          SliderBanner(sliders: _sliders),
+          const SizedBox(height: 16),
+          SectionHeader(
+            title: 'Recommend',
+            onViewAll: () => _openFoods('Recommend', foods: _recommended),
+          ),
+          const SizedBox(height: 12),
+          FoodGrid(foods: _recommended),
         ],
       ),
     );

@@ -1,73 +1,93 @@
 import 'package:flutter/material.dart';
-import '../../../core/utils/app_colors.dart';
+import '../../../core/utils/app_snack_bar.dart';
+import '../../../core/utils/validators.dart';
+import '../../../core/widgets/app_network_image.dart';
+import '../../../core/widgets/curved_page.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_text_field.dart';
+import '../../auth/data/models/user_model.dart';
+import '../../auth/data/services/auth_service.dart';
 
-class UpdateProfileView extends StatelessWidget {
-  const UpdateProfileView({super.key});
+/// PUT update_profile (form-data: name, phone)
+class UpdateProfileView extends StatefulWidget {
+  final UserModel? user;
+
+  const UpdateProfileView({super.key, this.user});
+
+  @override
+  State<UpdateProfileView> createState() => _UpdateProfileViewState();
+}
+
+class _UpdateProfileViewState extends State<UpdateProfileView> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController =
+      TextEditingController(text: widget.user?.name ?? '');
+  late final TextEditingController _phoneController =
+      TextEditingController(text: widget.user?.phone ?? '');
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _authService.updateProfile(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+      if (!mounted) return;
+      AppSnackBar.show(context, 'Profile updated');
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) AppSnackBar.show(context, e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.headerYellow,
-      body: Column(
-        children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Expanded(
-                    child: Text('My Profile', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 48),
-                ],
+    return CurvedPage(
+      title: 'My Profile',
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          children: [
+            Center(
+              child: AppNetworkImage(
+                url: widget.user?.imageUrl,
+                width: 92,
+                height: 92,
+                radius: 46,
+                placeholderIcon: Icons.person,
               ),
             ),
-          ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: CircleAvatar(
-                      radius: 46,
-                      backgroundColor: AppColors.inputFill,
-                      child: Icon(Icons.person, size: 50, color: AppColors.primaryOrange),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const CustomTextField(hintText: 'John Smith'),
-                  const SizedBox(height: 16),
-                  const Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const CustomTextField(hintText: '+123 567 89000'),
-                  const Spacer(),
-                  CustomPrimaryButton(
-                    text: 'Update Profile',
-                    onPressed: () => Navigator.pop(context),
-                  )
-                ],
-              ),
+            const SizedBox(height: 24),
+            CustomTextField(
+              label: 'Full Name',
+              hintText: 'John Smith',
+              controller: _nameController,
+              validator: (v) => Validators.required(v, 'Name'),
             ),
-          )
-        ],
+            CustomTextField(
+              label: 'Phone Number',
+              hintText: '+123 567 89000',
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              validator: Validators.phone,
+            ),
+            const SizedBox(height: 24),
+            CustomPrimaryButton(text: 'Update Profile', isLoading: _isLoading, onPressed: _save),
+          ],
+        ),
       ),
     );
   }

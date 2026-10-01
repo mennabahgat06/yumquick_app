@@ -57,7 +57,8 @@ class YumQuickApp extends StatelessWidget {
           ],
           theme: ThemeData(
             scaffoldBackgroundColor: AppColors.backgroundWhite,
-            colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primaryOrange),
+            colorScheme:
+                ColorScheme.fromSeed(seedColor: AppColors.primaryOrange),
             useMaterial3: true,
           ),
           home: startScreen,
